@@ -7,18 +7,36 @@
 const hre = require("hardhat");
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-  const unlockTime = currentTimestampInSeconds + ONE_YEAR_IN_SECS;
+  const SimpleStorage = await hre.ethers.getContractFactory("SimpleStorage");
+  console.log("Deploying contract...");
+  const simpleStorage = await SimpleStorage.deploy();
 
-  const lockedAmount = hre.ethers.utils.parseEther("1");
+  await simpleStorage.deployed();
 
-  const Lock = await hre.ethers.getContractFactory("Lock");
-  const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+  console.log("SimpleStorage deployed to:", simpleStorage.address);
 
-  await lock.deployed();
+  // only run on live networks - rinkeby
+  if (hre.network.config.chainId === 4 && process.env.ETHERSCAN_API_KEY) {
+    // wait for few blocks
+    await simpleStorage.deployTransaction.wait(6);
+    await verify(simpleStorage.address, []);
+  }
+}
 
-  console.log("Lock with 1 ETH deployed to:", lock.address);
+async function verify(contractAddress, args) {
+  console.log("Verifying contract...");
+  try {
+    await hre.run("verify:verify", {
+      address: contractAddress,
+      constructorArguments: args,
+    });
+  } catch (error) {
+    if (error.message.toLowerCase().includes("already verified")) {
+      console.log("Already verified!");
+    } else {
+      console.log(error);
+    }
+  }
 }
 
 // We recommend this pattern to be able to use async/await everywhere
